@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CargoCraft - Input Module</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+    <style>
+        html { background-color: #05060b; height: 100%; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'JetBrains Mono', monospace; }
+        body { background: transparent; color: #c8cee0; display: flex; flex-direction: column; min-height: 100vh; opacity: 0; overflow-x: hidden; }
+        #bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; display: block; }
+        header { background-color: rgba(5, 6, 11, 0.9); backdrop-filter: blur(10px); color: #ffffff; padding: 1.25rem 2.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(44, 61, 107, 0.5); z-index: 10; }
+        header h1 a { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 0.15em; color: #ffffff; text-decoration: none; }
+        header h1 a:hover { color: #5cf2ff; }
+        nav a { color: #8892b0; text-decoration: none; margin-left: 1.5rem; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px dashed transparent; transition: color 0.2s; }
+        nav a:hover, nav a.active { color: #5cf2ff; border-bottom-color: #5cf2ff; }
+        main { flex: 1; max-width: 800px; width: 100%; margin: 2rem auto; padding: 0 1.5rem; z-index: 1; }
+        .gt-card { background-color: rgba(16, 18, 27, 0.92); backdrop-filter: blur(12px); border: 1px solid #2c3d6b; border-radius: 12px; padding: 2rem; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8); transform: scale(0.95); opacity: 0; color: #e0e0e0; }
+        .gt-card h2 { font-size: 1.1rem; margin-bottom: 1.25rem; text-transform: uppercase; border-bottom: 1px dashed #2c3d6b; padding-bottom: 0.5rem; color: #ffffff; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 0.35rem; text-transform: uppercase; color: #8892b0; }
+        input, select { width: 100%; padding: 0.75rem; border: 1px solid #2c3d6b; border-radius: 6px; font-size: 0.9rem; font-family: inherit; background-color: rgba(12, 14, 20, 0.95); color: #ffffff; outline: none; }
+        input:focus, select:focus { background-color: #121520; border-color: #5cf2ff; box-shadow: 0 0 10px rgba(92,242,255,0.2); }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
+        @media(max-width: 600px) { .button-group { grid-template-columns: 1fr; } }
+        .gt-btn { width: 100%; min-height: 48px; padding: 12px; background-color: #5cf2ff; color: #05060b; border: 1px solid #5cf2ff; border-radius: 6px; font-weight: bold; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 12px rgba(92,242,255,0.2); transition: all 0.2s; }
+        .gt-btn:hover { background-color: #ffffff; box-shadow: 0 0 20px rgba(92,242,255,0.5); }
+        .gt-btn-redirect { background-color: transparent; color: #c8cee0; border-color: #2c3d6b; box-shadow: none; }
+        .gt-btn-redirect:hover { background-color: rgba(44, 61, 107, 0.3); color: #ffffff; border-color: #5cf2ff; }
+        #feedbackMsg { margin-top: 1rem; padding: 10px; text-align: center; font-weight: bold; font-size: 0.8rem; border: 1px solid #5cf2ff; border-radius: 6px; display: none; background: rgba(12, 14, 20, 0.95); color: #5cf2ff; text-transform: uppercase; }
+        #errorMsg { margin-top: 1rem; padding: 10px; text-align: center; font-weight: bold; font-size: 0.8rem; border: 1px solid #ff3344; border-radius: 6px; display: none; background: rgba(255, 51, 68, 0.15); color: #ff3344; text-transform: uppercase; }
+        footer { background-color: rgba(5, 6, 11, 0.9); color: #555; text-align: center; padding: 1rem; font-size: 0.75rem; border-top: 1px solid rgba(44, 61, 107, 0.5); z-index: 10; }
+    </style>
+</head>
+<body>
+    <canvas id="bg"></canvas>
+    <header>
+        <h1><a href="index.html">CargoCraft</a></h1>
+        <nav>
+            <a href="index.html">Intro</a>
+            <a href="input.html" class="active">Input Module</a>
+            <a href="reports.html">Safety Engine</a>
+            <a href="stacking.html">Stacking Visualizer</a>
+        </nav>
+    </header>
+    <main>
+        <div class="gt-card">
+            <h2>Cargo Parameters</h2>
+            <form id="cargoForm">
+                <div class="form-group">
+                    <label for="containerName">Container Identifier</label>
+                    <input type="text" id="containerName" placeholder="e.g., ISO Standard 20ft" required>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="maxWeight">Max Container Weight Limit (kg)</label>
+                        <input type="number" id="maxWeight" placeholder="10000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="itemName">Cargo Item Name</label>
+                        <input type="text" id="itemName" placeholder="e.g., Heavy Machinery Crate" required>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="length">Length (m)</label>
+                        <input type="number" step="0.1" id="length" placeholder="2.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="width">Width (m)</label>
+                        <input type="number" step="0.1" id="width" placeholder="2.0" required>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="height">Height (m)</label>
+                        <input type="number" step="0.1" id="height" placeholder="2.0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="weight">Item Weight (kg)</label>
+                        <input type="number" id="weight" placeholder="12000" required>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="material">Material Composition</label>
+                        <select id="material">
+                            <option value="Structural Carbon Steel (A36)">Structural Carbon Steel (A36)</option>
+                            <option value="Corrosion-Resistant Aluminum (6061-T6)">Corrosion-Resistant Aluminum (6061-T6)</option>
+                            <option value="Industrial Hardwood / Plywood">Industrial Hardwood / Plywood</option>
+                            <option value="High-Density Polyethylene (HDPE)">High-Density Polyethylene (HDPE)</option>
+                            <option value="Reinforced Composite Polymer">Reinforced Composite Polymer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stackRule">Cargo Density & Stacking Tier Class</label>
+                        <select id="stackRule">
+                            <option value="Class 1: Heavy Foundation Base (High Load-Bearing)">Class 1: Heavy Foundation Base (High Load-Bearing)</option>
+                            <option value="Class 2: Standard Unitized Cargo (General Bulk)">Class 2: Standard Unitized Cargo (General Bulk)</option>
+                            <option value="Class 3: Fragile / Sensitive Upper Tier (No Overstack)">Class 3: Fragile / Sensitive Upper Tier (No Overstack)</option>
+                            <option value="Class 4: Hazardous / Restricted Zone Cargo">Class 4: Hazardous / Restricted Zone Cargo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" id="addAnotherBtn" class="gt-btn">➕ Add Item & Continue</button>
+                    <button type="button" id="goToEngineBtn" class="gt-btn gt-btn-redirect">Launch Safety Engine ➔</button>
+                </div>
+            </form>
+            <div id="feedbackMsg">Item registered into buffer queue! Ready for next entry.</div>
+            <div id="errorMsg">⚠️ Error: Please fill out all required cargo fields before registering.</div>
+        </div>
+    </main>
+    <footer><p>&copy; 2026 CargoCraft Systems</p></footer>
+    <script>
+    (function() {
+      const CFG = { clear: '#05060b', ink: '#c8cee0', bg: '#06070d', line: '#2c3d6b', hot: '#5cf2ff', cells: 1.4, speed: 0.55, grain: 0.016, dprCap: 1.5, maxFragments: 2400000, fps: 60, pointer: true };
+      const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const COARSE = matchMedia('(hover: none) and (pointer: coarse)').matches;
+      const FINE = matchMedia('(hover: hover) and (pointer: fine)').matches;
+      const MOBILE = innerWidth < 768 || COARSE;
+      const cv = document.getElementById('bg');
+      const gl = cv.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+      if (!gl) { cv.style.background = CFG.clear; return; }
+      const VERT = `#version 300 es\nvoid main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+      const FRAG = `#version 300 es
+      precision highp float; out vec4 O; uniform vec2 uRes; uniform float uTime; uniform vec2 uPointer; uniform float uOn; uniform vec3 uBg, uLine, uHot; uniform float uCells, uSpeed, uGrain;
+      float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float grid(vec2 g, float w){ vec2 d = abs(fract(g) - 0.5); vec2 f = fwidth(g) * w; vec2 l = smoothstep(f, vec2(0.0), d - f); return max(l.x, l.y); }
+      void main(){
+        vec2 sp = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y; float horizon = 0.30; float y = sp.y - horizon;
+        if (y > -0.006) { float glow = exp(-(y * y) / 0.0016) * 0.55; vec3 sky = uBg + uHot * glow; sky += (h21(gl_FragCoord.xy + fract(uTime) * 33.7) - 0.5) * uGrain; O = vec4(max(sky, 0.0), 1.0); return; }
+        float z = 0.36 / -y; vec2 g = vec2(sp.x * z, z + uTime * uSpeed) * uCells; float line = grid(g, 0.9);
+        vec2 pw = vec2((uPointer.x - 0.5) * uRes.x / uRes.y, 0.0); float pz = 0.36 / max(0.02, (0.5 - uPointer.y) + horizon);
+        float d = length(vec2(sp.x * z, z) - vec2(pw.x * pz / max(pz, 0.001), pz)); float ring = exp(-pow(d - 1.4, 2.0) * 1.6) * uOn;
+        float fade = exp(-z * 0.10); vec3 col = uBg; col += uLine * line * fade; col += uHot * line * ring * 1.8 * fade; col += uHot * exp(-(y * y) / 0.0022) * 0.20;
+        col += (h21(gl_FragCoord.xy + fract(uTime) * 33.7) - 0.5) * uGrain; O = vec4(max(col, 0.0), 1.0);
+      }`;
+      function compile(type, src) { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); return sh; }
+      const prog = gl.createProgram(); gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT)); gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG)); gl.linkProgram(prog); gl.useProgram(prog);
+      const U = {}; for (let i = 0, n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS); i < n; i++) { const nm = gl.getActiveUniform(prog, i).name.replace(/\[0\]$/, ''); U[nm] = gl.getUniformLocation(prog, nm); }
+      const rgb = h => { const n = parseInt(h.slice(1), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
+      let W = 0, H = 0; function fit() { const w = cv.clientWidth || innerWidth, h = cv.clientHeight || innerHeight; const byTier = Math.min(devicePixelRatio || 1, MOBILE ? 1.25 : (CFG.dprCap || 1.75)); const byArea = Math.sqrt((CFG.maxFragments || 2.4e6) / Math.max(1, w * h)); const dpr = Math.max(0.6, Math.min(byTier, byArea)); const nw = Math.round(w * dpr), nh = Math.round(h * dpr); if (nw === W && nh === H) return false; W = nw; H = nh; cv.width = W; cv.height = H; gl.viewport(0, 0, W, H); return true; }
+      fit(); addEventListener('resize', fit, { passive: true });
+      const P = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, on: 0 }; if (FINE && !MOBILE) { addEventListener('pointermove', e => { P.tx = e.clientX / innerWidth; P.ty = 1 - e.clientY / innerHeight; P.on = 1; }, { passive: true }); }
+      gl.uniform3fv(U.uBg, rgb(CFG.bg)); gl.uniform3fv(U.uLine, rgb(CFG.line)); gl.uniform3fv(U.uHot, rgb(CFG.hot)); gl.uniform1f(U.uCells, CFG.cells); gl.uniform1f(U.uSpeed, CFG.speed); gl.uniform1f(U.uGrain, CFG.grain);
+      function draw(t) { if (fit()) gl.viewport(0, 0, W, H); gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uTime, RM ? 3.0 : t); gl.uniform2f(U.uPointer, P.x, P.y); gl.uniform1f(U.uOn, P.on); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+      const t0 = performance.now(); let last = t0;
+      function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000) || 0.016; last = now; const k = 1 - Math.pow(1 - 0.08, dt * 60); P.x += (P.tx - P.x) * k; P.y += (P.ty - P.y) * k; draw((now - t0) / 1000); }
+      draw(0); requestAnimationFrame(loop);
+    })();
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            anime({ targets: 'body', opacity: 1, duration: 400 });
+            anime({ targets: '.gt-card', scale: [0.95, 1], opacity: [0, 1], easing: 'easeOutBack', duration: 600 });
+        });
+
+        function saveCurrentItem() {
+            const containerName = document.getElementById('containerName').value;
+            const maxWeight = document.getElementById('maxWeight').value;
+            const itemName = document.getElementById('itemName').value;
+            const length = document.getElementById('length').value;
+            const width = document.getElementById('width').value;
+            const height = document.getElementById('height').value;
+            const weight = document.getElementById('weight').value;
+
+            const feedbackMsg = document.getElementById('feedbackMsg');
+            const errorMsg = document.getElementById('errorMsg');
+            feedbackMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            if (!containerName || !maxWeight || !itemName || !length || !width || !height || !weight) {
+                errorMsg.style.display = 'block';
+                anime({ targets: '#errorMsg', scale: [0.95, 1], opacity: [0, 1], duration: 300, easing: 'easeOutQuad' });
+                return false;
+            }
+
+            const cargoData = {
+                containerName: containerName,
+                maxWeight: parseFloat(maxWeight),
+                itemName: itemName,
+                dimensions: `${length}m×${width}m×${height}m`,
+                weight: parseFloat(weight),
+                material: document.getElementById('material').value,
+                stackRule: document.getElementById('stackRule').value
+            };
+
+            let existingLogs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
+            existingLogs.push(cargoData);
+            sessionStorage.setItem('cargoLogs', JSON.stringify(existingLogs));
+            return true;
+        }
+
+        document.getElementById('addAnotherBtn').addEventListener('click', () => {
+            if (saveCurrentItem()) {
+                const msg = document.getElementById('feedbackMsg');
+                msg.style.display = 'block';
+                document.getElementById('itemName').value = '';
+                document.getElementById('length').value = '';
+                document.getElementById('width').value = '';
+                document.getElementById('height').value = '';
+                document.getElementById('weight').value = '';
+                anime({ targets: '#feedbackMsg', scale: [0.9, 1], opacity: [0, 1], duration: 300, easing: 'easeOutQuad' });
+            }
+        });
+
+        document.getElementById('goToEngineBtn').addEventListener('click', () => {
+            const itemName = document.getElementById('itemName').value;
+            if (itemName && !saveCurrentItem()) return;
+            
+            anime({
+                targets: '.gt-card', scale: [1, 0.95], opacity: [1, 0], duration: 400, easing: 'easeInOutQuad',
+                complete: () => { window.location.href = 'reports.html'; }
+            });
+        });
+    </script>
+</body>
+</html>

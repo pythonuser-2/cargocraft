@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CargoCraft - Freight Safety & Packing Calculator</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+    <style>
+        html { background-color: #05060b; height: 100%; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'JetBrains Mono', monospace; }
+        body { background: transparent; color: #c8cee0; display: flex; flex-direction: column; min-height: 100vh; opacity: 0; overflow-x: hidden; }
+        #bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; display: block; }
+        header { background-color: rgba(5, 6, 11, 0.9); backdrop-filter: blur(10px); color: #ffffff; padding: 1.25rem 2.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(44, 61, 107, 0.5); z-index: 10; }
+        header h1 a { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 0.15em; color: #ffffff; text-decoration: none; }
+        header h1 a:hover { color: #5cf2ff; }
+        nav a { color: #8892b0; text-decoration: none; margin-left: 1.5rem; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px dashed transparent; transition: color 0.2s; }
+        nav a:hover, nav a.active { color: #5cf2ff; border-bottom-color: #5cf2ff; }
+        main { flex: 1; max-width: 1000px; width: 100%; margin: auto; padding: 4rem 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 1; }
+        .hero-container { transform: translateY(20px); opacity: 0; }
+        .hero-container h1 { font-size: clamp(3rem, 6vw, 5rem); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; color: #ffffff; font-weight: 700; }
+        .hero-container h1 span { color: #5cf2ff; }
+        .hero-container p { font-size: 1.05rem; line-height: 1.6; color: #8892b0; margin-bottom: 2.5rem; max-width: 650px; margin-left: auto; margin-right: auto; }
+        .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .gt-btn { display: inline-block; padding: 14px 28px; background-color: #5cf2ff; color: #05060b; border: 1px solid #5cf2ff; border-radius: 6px; font-weight: bold; text-decoration: none; text-transform: uppercase; cursor: pointer; font-size: 0.85rem; letter-spacing: 0.08em; box-shadow: 0 4px 15px rgba(92, 242, 255, 0.2); transition: all 0.2s ease; }
+        .gt-btn:hover { background-color: #ffffff; box-shadow: 0 0 25px rgba(92, 242, 255, 0.5); }
+        .gt-btn-alt { background-color: transparent; color: #c8cee0; border: 1px solid #2c3d6b; box-shadow: none; }
+        .gt-btn-alt:hover { background-color: rgba(44, 61, 107, 0.3); color: #ffffff; border-color: #5cf2ff; }
+        footer { background-color: rgba(5, 6, 11, 0.9); color: #555; text-align: center; padding: 1rem; font-size: 0.75rem; border-top: 1px solid rgba(44, 61, 107, 0.5); z-index: 10; }
+    </style>
+</head>
+<body>
+    <canvas id="bg"></canvas>
+    <header>
+        <h1><a href="index.html">CargoCraft</a></h1>
+        <nav>
+            <a href="index.html" class="active">Intro</a>
+            <a href="input.html">Input Module</a>
+            <a href="reports.html">Safety Engine</a>
+            <a href="stacking.html">Stacking Visualizer</a>
+        </nav>
+    </header>
+    <main>
+        <div class="hero-container" id="hero">
+            <h1>Cargo<span>Craft</span></h1>
+            <p>Advanced computational logistics engine for precision freight safety calculation, structural load distribution analysis, and dynamic spatial grid packing verification.</p>
+            <div class="hero-actions">
+                <a href="input.html" class="gt-btn">Launch Input Module ➔</a>
+                <a href="reports.html" class="gt-btn gt-btn-alt">Safety Engine</a>
+            </div>
+        </div>
+    </main>
+    <footer><p>&copy; 2026 CargoCraft Systems</p></footer>
+    <script>
+    (function() {
+      const CFG = { clear: '#05060b', ink: '#c8cee0', bg: '#06070d', line: '#2c3d6b', hot: '#5cf2ff', cells: 1.4, speed: 0.55, grain: 0.016, dprCap: 1.5, maxFragments: 2400000, fps: 60, pointer: true };
+      const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const COARSE = matchMedia('(hover: none) and (pointer: coarse)').matches;
+      const FINE = matchMedia('(hover: hover) and (pointer: fine)').matches;
+      const MOBILE = innerWidth < 768 || COARSE;
+      const cv = document.getElementById('bg');
+      const gl = cv.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+      if (!gl) { cv.style.background = CFG.clear; return; }
+      const VERT = `#version 300 es\nvoid main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+      const FRAG = `#version 300 es
+      precision highp float; out vec4 O; uniform vec2 uRes; uniform float uTime; uniform vec2 uPointer; uniform float uOn; uniform vec3 uBg, uLine, uHot; uniform float uCells, uSpeed, uGrain;
+      float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float grid(vec2 g, float w){ vec2 d = abs(fract(g) - 0.5); vec2 f = fwidth(g) * w; vec2 l = smoothstep(f, vec2(0.0), d - f); return max(l.x, l.y); }
+      void main(){
+        vec2 sp = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y; float horizon = 0.30; float y = sp.y - horizon;
+        if (y > -0.006) { float glow = exp(-(y * y) / 0.0016) * 0.55; vec3 sky = uBg + uHot * glow; sky += (h21(gl_FragCoord.xy + fract(uTime) * 33.7) - 0.5) * uGrain; O = vec4(max(sky, 0.0), 1.0); return; }
+        float z = 0.36 / -y; vec2 g = vec2(sp.x * z, z + uTime * uSpeed) * uCells; float line = grid(g, 0.9);
+        vec2 pw = vec2((uPointer.x - 0.5) * uRes.x / uRes.y, 0.0); float pz = 0.36 / max(0.02, (0.5 - uPointer.y) + horizon);
+        float d = length(vec2(sp.x * z, z) - vec2(pw.x * pz / max(pz, 0.001), pz)); float ring = exp(-pow(d - 1.4, 2.0) * 1.6) * uOn;
+        float fade = exp(-z * 0.10); vec3 col = uBg; col += uLine * line * fade; col += uHot * line * ring * 1.8 * fade; col += uHot * exp(-(y * y) / 0.0022) * 0.20;
+        col += (h21(gl_FragCoord.xy + fract(uTime) * 33.7) - 0.5) * uGrain; O = vec4(max(col, 0.0), 1.0);
+      }`;
+      function compile(type, src) { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); return sh; }
+      const prog = gl.createProgram(); gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT)); gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG)); gl.linkProgram(prog); gl.useProgram(prog);
+      const U = {}; for (let i = 0, n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS); i < n; i++) { const nm = gl.getActiveUniform(prog, i).name.replace(/\[0\]$/, ''); U[nm] = gl.getUniformLocation(prog, nm); }
+      const rgb = h => { const n = parseInt(h.slice(1), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
+      let W = 0, H = 0; function fit() { const w = cv.clientWidth || innerWidth, h = cv.clientHeight || innerHeight; const byTier = Math.min(devicePixelRatio || 1, MOBILE ? 1.25 : (CFG.dprCap || 1.75)); const byArea = Math.sqrt((CFG.maxFragments || 2.4e6) / Math.max(1, w * h)); const dpr = Math.max(0.6, Math.min(byTier, byArea)); const nw = Math.round(w * dpr), nh = Math.round(h * dpr); if (nw === W && nh === H) return false; W = nw; H = nh; cv.width = W; cv.height = H; gl.viewport(0, 0, W, H); return true; }
+      fit(); addEventListener('resize', fit, { passive: true });
+      const P = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, on: 0 }; if (FINE && !MOBILE) { addEventListener('pointermove', e => { P.tx = e.clientX / innerWidth; P.ty = 1 - e.clientY / innerHeight; P.on = 1; }, { passive: true }); }
+      gl.uniform3fv(U.uBg, rgb(CFG.bg)); gl.uniform3fv(U.uLine, rgb(CFG.line)); gl.uniform3fv(U.uHot, rgb(CFG.hot)); gl.uniform1f(U.uCells, CFG.cells); gl.uniform1f(U.uSpeed, CFG.speed); gl.uniform1f(U.uGrain, CFG.grain);
+      function draw(t) { if (fit()) gl.viewport(0, 0, W, H); gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uTime, RM ? 3.0 : t); gl.uniform2f(U.uPointer, P.x, P.y); gl.uniform1f(U.uOn, P.on); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+      const t0 = performance.now(); let last = t0;
+      function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000) || 0.016; last = now; const k = 1 - Math.pow(1 - 0.08, dt * 60); P.x += (P.tx - P.x) * k; P.y += (P.ty - P.y) * k; draw((now - t0) / 1000); }
+      draw(0); requestAnimationFrame(loop);
+    })();
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            anime({ targets: '#hero', translateY: [20, 0], opacity: [0, 1], duration: 800, easing: 'easeOutExpo' });
+            anime({ targets: 'body', opacity: 1, duration: 400 });
+        });
+    </script>
+</body>
+</html>
