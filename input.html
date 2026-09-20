@@ -48,35 +48,35 @@
     </header>
     <main>
         <div class="gt-card">
-            <h2>Cargo Parameters</h2>
+            <h2>Cargo & Geometry Parameters</h2>
             <form id="cargoForm">
                 <div class="form-group">
                     <label for="containerName">Container Identifier</label>
-                    <input type="text" id="containerName" placeholder="e.g., ISO Standard 20ft" required>
+                    <input type="text" id="containerName" placeholder="e.g., ISO Standard 40ft High Cube" required>
                 </div>
                 <div class="grid-2">
                     <div class="form-group">
                         <label for="maxWeight">Max Container Weight Limit (kg)</label>
-                        <input type="number" id="maxWeight" placeholder="10000" required>
+                        <input type="number" id="maxWeight" placeholder="28000" required>
                     </div>
                     <div class="form-group">
                         <label for="itemName">Cargo Item Name</label>
-                        <input type="text" id="itemName" placeholder="e.g., Heavy Machinery Crate" required>
+                        <input type="text" id="itemName" placeholder="e.g., Industrial Hydraulic Generator" required>
                     </div>
                 </div>
                 <div class="grid-2">
                     <div class="form-group">
-                        <label for="length">Length (m)</label>
-                        <input type="number" step="0.1" id="length" placeholder="2.5" required>
+                        <label for="length">Bounding Length (m)</label>
+                        <input type="number" step="0.1" id="length" placeholder="3.5" required>
                     </div>
                     <div class="form-group">
-                        <label for="width">Width (m)</label>
-                        <input type="number" step="0.1" id="width" placeholder="2.0" required>
+                        <label for="width">Bounding Width (m)</label>
+                        <input type="number" step="0.1" id="width" placeholder="2.2" required>
                     </div>
                 </div>
                 <div class="grid-2">
                     <div class="form-group">
-                        <label for="height">Height (m)</label>
+                        <label for="height">Bounding Height (m)</label>
                         <input type="number" step="0.1" id="height" placeholder="2.0" required>
                     </div>
                     <div class="form-group">
@@ -91,19 +91,26 @@
                             <option value="Structural Carbon Steel (A36)">Structural Carbon Steel (A36)</option>
                             <option value="Corrosion-Resistant Aluminum (6061-T6)">Corrosion-Resistant Aluminum (6061-T6)</option>
                             <option value="Industrial Hardwood / Plywood">Industrial Hardwood / Plywood</option>
-                            <option value="High-Density Polyethylene (HDPE)">High-Density Polyethylene (HDPE)</option>
                             <option value="Reinforced Composite Polymer">Reinforced Composite Polymer</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="stackRule">Cargo Density & Stacking Tier Class</label>
-                        <select id="stackRule">
-                            <option value="Class 1: Heavy Foundation Base (High Load-Bearing)">Class 1: Heavy Foundation Base (High Load-Bearing)</option>
-                            <option value="Class 2: Standard Unitized Cargo (General Bulk)">Class 2: Standard Unitized Cargo (General Bulk)</option>
-                            <option value="Class 3: Fragile / Sensitive Upper Tier (No Overstack)">Class 3: Fragile / Sensitive Upper Tier (No Overstack)</option>
-                            <option value="Class 4: Hazardous / Restricted Zone Cargo">Class 4: Hazardous / Restricted Zone Cargo</option>
+                        <label for="geometryProfile">Geometry & Shape Profile</label>
+                        <select id="geometryProfile">
+                            <option value="Standard Rectangular Cuboid">Standard Rectangular Cuboid</option>
+                            <option value="L-Shaped Composite Component">L-Shaped Composite Component</option>
+                            <option value="Cylindrical / Tapered Tank">Cylindrical / Tapered Tank</option>
+                            <option value="Asymmetric Irregular Mesh">Asymmetric Irregular Mesh</option>
                         </select>
                     </div>
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label for="stackRule">Cargo Density & Stacking Tier Class</label>
+                    <select id="stackRule">
+                        <option value="Class 1: Heavy Foundation Base (High Load-Bearing)">Class 1: Heavy Foundation Base (High Load-Bearing)</option>
+                        <option value="Class 2: Standard Unitized Cargo (General Bulk)">Class 2: Standard Unitized Cargo (General Bulk)</option>
+                        <option value="Class 3: Fragile / Sensitive Upper Tier (No Overstack)">Class 3: Fragile / Sensitive Upper Tier (No Overstack)</option>
+                    </select>
                 </div>
                 <div class="button-group">
                     <button type="button" id="addAnotherBtn" class="gt-btn">➕ Add Item & Continue</button>
@@ -186,6 +193,7 @@
                 dimensions: `${length}m×${width}m×${height}m`,
                 weight: parseFloat(weight),
                 material: document.getElementById('material').value,
+                geometryProfile: document.getElementById('geometryProfile').value,
                 stackRule: document.getElementById('stackRule').value
             };
 

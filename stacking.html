@@ -78,12 +78,28 @@
             font-weight: bold;
         }
 
+        .matrix-cell.irregular {
+            background: rgba(255, 183, 0, 0.15);
+            border: 1px solid #ffb700;
+            color: #ffb700;
+        }
+
         .efficiency-badge {
             font-size: 0.7rem;
             padding: 3px 8px;
             background: rgba(0, 255, 102, 0.15);
             color: #00ff66;
             border: 1px solid #00ff66;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .physics-badge {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            background: rgba(255, 183, 0, 0.15);
+            color: #ffb700;
+            border: 1px solid #ffb700;
             border-radius: 4px;
             text-transform: uppercase;
         }
@@ -107,13 +123,13 @@
     <main>
         <div class="gt-card">
             <h2>
-                <span>Spatial Packing Simulation</span>
+                <span>Spatial Physics & Voxel Decomposition Engine</span>
                 <a href="reports.html" class="gt-btn-back">← Back to Safety Engine</a>
             </h2>
-            <p style="font-size: 0.85rem; color: #8892b0; margin-bottom: 0.5rem;">Algorithmic spatial layout computation evaluating optimal floor grid arrangement (Length x Width) and structural stability.</p>
+            <p style="font-size: 0.85rem; color: #8892b0; margin-bottom: 0.5rem;">Algorithmic spatial layout computation evaluating bounding grids (Length × Width) and physics-based irregular shape decomposition.</p>
             
             <div class="spatial-stage" id="spatialStage">
-                <!-- Dynamically simulated spatial grids -->
+                <!-- Dynamically simulated spatial grids with physics profiles -->
             </div>
         </div>
     </main>
@@ -152,7 +168,7 @@
       const P = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, on: 0 }; if (FINE && !MOBILE) { addEventListener('pointermove', e => { P.tx = e.clientX / innerWidth; P.ty = 1 - e.clientY / innerHeight; P.on = 1; }, { passive: true }); }
       gl.uniform3fv(U.uBg, rgb(CFG.bg)); gl.uniform3fv(U.uLine, rgb(CFG.line)); gl.uniform3fv(U.uHot, rgb(CFG.hot)); gl.uniform1f(U.uCells, CFG.cells); gl.uniform1f(U.uSpeed, CFG.speed); gl.uniform1f(U.uGrain, CFG.grain);
       function draw(t) { if (fit()) gl.viewport(0, 0, W, H); gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uTime, RM ? 3.0 : t); gl.uniform2f(U.uPointer, P.x, P.y); gl.uniform1f(U.uOn, P.on); gl.drawArrays(gl.TRIANGLES, 0, 3); }
-      const t0 = performance.now(); let last = t0;
+      const t0 = performance.now(); last = t0;
       function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000) || 0.016; last = now; const k = 1 - Math.pow(1 - 0.08, dt * 60); P.x += (P.tx - P.x) * k; P.y += (P.ty - P.y) * k; draw((now - t0) / 1000); }
       draw(0); requestAnimationFrame(loop);
     })();
@@ -166,7 +182,7 @@
             let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
 
             if (logs.length === 0) {
-                stage.innerHTML = `<div style="text-align: center; color: #8892b0; padding: 2rem;">No cargo items registered for spatial simulation. Please use the Input Module.</div>`;
+                stage.innerHTML = `<div style="text-align: center; color: #8892b0; padding: 2rem;">No cargo items registered for spatial physics simulation. Please use the Input Module.</div>`;
                 return;
             }
 
@@ -176,6 +192,8 @@
                 const dims = item.dimensions.replace(/m/g, '').split('×').map(Number);
                 const l = dims[0] || 2.0;
                 const w = dims[1] || 1.5;
+                const profile = item.geometryProfile || "Standard Rectangular Cuboid";
+                const isIrregular = profile !== "Standard Rectangular Cuboid";
 
                 let cols = Math.max(2, Math.round(6 / l));
                 let rows = Math.max(2, Math.round(4 / w));
@@ -189,10 +207,13 @@
                             <strong style="color:#fff;">📦 ${item.itemName}</strong> 
                             <span style="font-size:0.75rem; color:#8892b0;">(Container: ${item.containerName})</span>
                         </div>
-                        <span class="efficiency-badge">Optimal Grid: ${cols}×${rows} (${totalUnits} units)</span>
+                        <div style="display: flex; gap: 6px;">
+                            <span class="physics-badge">${profile}</span>
+                            <span class="efficiency-badge">Grid: ${cols}×${rows}</span>
+                        </div>
                     </div>
                     <div style="font-size:0.75rem; color:#8892b0;">
-                        Dimensions: ${item.dimensions} | Weight: ${item.weight.toLocaleString()} kg | Density Class: ${item.stackRule}
+                        Dimensions: ${item.dimensions} | Weight: ${item.weight.toLocaleString()} kg | Density: ${item.stackRule}
                     </div>
                     <div class="grid-matrix-preview" id="matrix-${index}"></div>
                 `;
@@ -202,8 +223,9 @@
                 for (let r = 0; r < rows; r++) {
                     for (let c = 0; c < cols; c++) {
                         const cell = document.createElement('div');
-                        cell.className = 'matrix-cell';
-                        cell.textContent = `${r+1},${c+1}`;
+                        const isBoundary = isIrregular && (r === 0 || c === 0 || r === rows - 1 || c === cols - 1);
+                        cell.className = isBoundary ? 'matrix-cell irregular' : 'matrix-cell';
+                        cell.textContent = isBoundary ? `v:${r+1},${c+1}` : `${r+1},${c+1}`;
                         matrixContainer.appendChild(cell);
                     }
                 }
