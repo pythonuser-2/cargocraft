@@ -82,7 +82,6 @@
         </div>
     </main>
     <footer><p>&copy; 2026 CargoCraft Systems</p></footer>
-
     <script>
     (function() {
       const CFG = { clear: '#05060b', ink: '#c8cee0', bg: '#06070d', line: '#2c3d6b', hot: '#5cf2ff', cells: 1.4, speed: 0.55, grain: 0.016, dprCap: 1.5, maxFragments: 2400000, fps: 60, pointer: true };
@@ -121,7 +120,8 @@
       draw(0); requestAnimationFrame(loop);
     })();
     </script>
-    <script>
+
+<script>
         document.addEventListener("DOMContentLoaded", () => {
             anime.timeline({ easing: 'easeOutExpo' })
                 .add({ targets: 'body', opacity: 1, duration: 400 })
@@ -129,76 +129,102 @@
 
             loadSimulationEngine();
 
-            document.getElementById('clearBtn').addEventListener('click', () => {
+            document.getElementById('clearBtn').addEventListener('click', async () => {
                 sessionStorage.removeItem('cargoLogs');
                 loadSimulationEngine();
             });
         });
 
-        function deleteItem(index) {
-            let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
-            logs.splice(index, 1);
-            sessionStorage.setItem('cargoLogs', JSON.stringify(logs));
-            loadSimulationEngine();
-        }
-
-        function loadSimulationEngine() {
+        async function loadSimulationEngine() {
             const tbody = document.getElementById('engineTableBody');
             const banner = document.getElementById('statusBanner');
-            let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
 
-            if (logs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #8892b0; padding: 2rem;">No active cargo logs found. Please use the Input Module to register items.</td></tr>`;
-                banner.className = 'status-banner safe';
-                banner.innerHTML = `✅ SYSTEM STATUS: No Cargo Loaded. Ready for Input Stream.`;
-                return;
-            }
+            try {
+                // Fetch directly from live Java REST server
+                const response = await fetch('http://localhost:8080/api/cargo');
+                if (!response.ok) throw new Error('Server returned ' + response.status);
+                
+                const data = await response.json();
+                const items = data.items || [];
 
-            tbody.innerHTML = '';
-            let totalWeight = 0;
-            let maxLimit = logs[0].maxWeight || 15000;
+                if (items.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #8892b0; padding: 2rem;">No active cargo records in database. Use the Input Module to register items.</td></tr>`;
+                    banner.className = 'status-banner safe';
+                    banner.innerHTML = `✅ SYSTEM STATUS: No Cargo Loaded. Ready for Input Stream.`;
+                    return;
+                }
 
-            logs.forEach((item, index) => {
-                totalWeight += item.weight;
-                if(item.maxWeight) maxLimit = item.maxWeight;
+                tbody.innerHTML = '';
+                let totalWeight = parseFloat(data.totalWeight) || 0;
+                let maxLimit = 28000.0; // ISO Standard Dry Van Limit
 
-                const row = document.createElement('tr');
-                row.className = 'log-row';
-                row.innerHTML = `
-                    <td><strong>${item.containerName}</strong></td>
-                    <td>${item.itemName}</td>
-                    <td>${item.dimensions}</td>
-                    <td>${item.weight.toLocaleString()} kg</td>
-                    <td><span style="color: #5cf2ff; font-weight: bold;">▸ ${item.stackRule}</span></td>
-                    <td>Balanced (Stable)</td>
-                    <td><button class="del-row-btn" onclick="deleteItem(${index})" title="Remove Item">✕</button></td>
-                `;
-                tbody.appendChild(row);
-            });
+                items.forEach((item) => {
+                    const row = document.createElement('tr');
+                    row.className = 'log-row';
+                    row.innerHTML = `
+                        <td><strong>ISO 20ft</strong></td>
+                        <td>${item.name}</td>
+                        <td>${item.length}m × ${item.width}m × ${item.height}m</td>
+                        <td>${item.weight.toLocaleString()} kg</td>
+                        <td><span style="color: #5cf2ff; font-weight: bold;">SF: ${item.safetyFactor} (${item.status})</span></td>
+                        <td>Stress: ${item.stressMpa} MPa</td>
+                        <td><span style="color: #00ff66;">✓ Synced</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
 
-            anime({
-                targets: '.log-row',
-                translateX: [-10, 0],
-                opacity: [0, 1],
-                delay: anime.stagger(80),
-                duration: 500,
-                easing: 'easeOutExpo'
-            });
+                anime({
+                    targets: '.log-row',
+                    translateX: [-10, 0],
+                    opacity: [0, 1],
+                    delay: anime.stagger(80),
+                    duration: 500,
+                    easing: 'easeOutExpo'
+                });
 
-            const ratio = (totalWeight / maxLimit) * 100;
+                const ratio = (totalWeight / maxLimit) * 100;
 
-            if (totalWeight > maxLimit) {
-                banner.className = 'status-banner danger';
-                banner.innerHTML = `🚨 CRITICAL WARNING: Total Cargo Weight (${totalWeight.toLocaleString()} kg) Exceeds Max Limit (${maxLimit.toLocaleString()} kg)! High Risk of Structural Failure.`;
-            } else if (ratio > 85) {
-                banner.className = 'status-banner';
-                banner.style.backgroundColor = 'rgba(217, 119, 6, 0.2)';
-                banner.style.color = '#ffb700';
-                banner.style.borderColor = '#ffb700';
-                banner.innerHTML = `⚠️ WARNING: Capacity at ${ratio.toFixed(1)}%. Approaching maximum load safety threshold.`;
-            } else {
-                banner.className = 'status-banner safe';
-                banner.innerHTML = `✅ SYSTEM STATUS: All Stacking Margins Stable (${ratio.toFixed(1)}% Capacity Used). Safe for Transit.`;
+                if (totalWeight > maxLimit) {
+                    banner.className = 'status-banner danger';
+                    banner.innerHTML = `🚨 CRITICAL WARNING: Total Cargo Weight (${totalWeight.toLocaleString()} kg) Exceeds Max Limit (${maxLimit.toLocaleString()} kg)! High Risk of Structural Failure.`;
+                } else if (ratio > 85) {
+                    banner.className = 'status-banner';
+                    banner.style.backgroundColor = 'rgba(217, 119, 6, 0.2)';
+                    banner.style.color = '#ffb700';
+                    banner.style.borderColor = '#ffb700';
+                    banner.innerHTML = `⚠️ WARNING: Capacity at ${ratio.toFixed(1)}%. Approaching maximum load safety threshold.`;
+                } else {
+                    banner.className = 'status-banner safe';
+                    banner.innerHTML = `✅ SYSTEM STATUS: All Stacking Margins Stable (${ratio.toFixed(1)}% Capacity Used | Vol Util: ${data.utilization}%). Safe for Transit.`;
+                }
+
+            } catch (err) {
+                console.warn('Backend server unreachable, falling back to local session buffer:', err);
+                
+                // Fallback to local session storage if Java backend is offline
+                let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
+                if (logs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #8892b0; padding: 2rem;">No active cargo logs found. Ensure CargoHttpServer is running.</td></tr>`;
+                    banner.className = 'status-banner safe';
+                    banner.innerHTML = `✅ SYSTEM STATUS: No Cargo Loaded. Ready for Input Stream.`;
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                logs.forEach((item, index) => {
+                    const row = document.createElement('tr');
+                    row.className = 'log-row';
+                    row.innerHTML = `
+                        <td><strong>${item.containerName || 'ISO 20ft'}</strong></td>
+                        <td>${item.itemName}</td>
+                        <td>${item.length || item.dimensions}m</td>
+                        <td>${(item.weight || 0).toLocaleString()} kg</td>
+                        <td><span style="color: #5cf2ff; font-weight: bold;">▸ ${item.densityClass || item.stackRule}</span></td>
+                        <td>Local Buffer</td>
+                        <td><span style="color: #ffb700;">Offline Mode</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
             }
         }
     </script>

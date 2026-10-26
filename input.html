@@ -166,7 +166,7 @@
             anime({ targets: '.gt-card', scale: [0.95, 1], opacity: [0, 1], easing: 'easeOutBack', duration: 600 });
         });
 
-        function saveCurrentItem() {
+        async function saveCurrentItem() {
             const containerName = document.getElementById('containerName').value;
             const maxWeight = document.getElementById('maxWeight').value;
             const itemName = document.getElementById('itemName').value;
@@ -181,6 +181,7 @@
             errorMsg.style.display = 'none';
 
             if (!containerName || !maxWeight || !itemName || !length || !width || !height || !weight) {
+                errorMsg.innerText = '⚠️ Error: Please fill out all required cargo fields before registering.';
                 errorMsg.style.display = 'block';
                 anime({ targets: '#errorMsg', scale: [0.95, 1], opacity: [0, 1], duration: 300, easing: 'easeOutQuad' });
                 return false;
@@ -190,22 +191,44 @@
                 containerName: containerName,
                 maxWeight: parseFloat(maxWeight),
                 itemName: itemName,
-                dimensions: `${length}m×${width}m×${height}m`,
+                length: parseFloat(length),
+                width: parseFloat(width),
+                height: parseFloat(height),
                 weight: parseFloat(weight),
                 material: document.getElementById('material').value,
                 geometryProfile: document.getElementById('geometryProfile').value,
-                stackRule: document.getElementById('stackRule').value
+                densityClass: document.getElementById('stackRule').value
             };
 
-            let existingLogs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
-            existingLogs.push(cargoData);
-            sessionStorage.setItem('cargoLogs', JSON.stringify(existingLogs));
-            return true;
+            try {
+                // Post directly to the Java CargoHttpServer endpoint
+                const response = await fetch('http://localhost:8080/api/cargo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cargoData)
+                });
+
+                if (!response.ok) throw new Error('Server returned ' + response.status);
+                
+                // Keep local session updated for immediate UI continuity
+                let existingLogs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
+                existingLogs.push(cargoData);
+                sessionStorage.setItem('cargoLogs', JSON.stringify(existingLogs));
+
+                return true;
+            } catch (err) {
+                console.error('Failed to persist to Java backend:', err);
+                errorMsg.innerText = '⚠️ Warning: Backend offline. Ensure CargoHttpServer is running.';
+                errorMsg.style.display = 'block';
+                return false;
+            }
         }
 
-        document.getElementById('addAnotherBtn').addEventListener('click', () => {
-            if (saveCurrentItem()) {
+        document.getElementById('addAnotherBtn').addEventListener('click', async () => {
+            const success = await saveCurrentItem();
+            if (success) {
                 const msg = document.getElementById('feedbackMsg');
+                msg.innerText = 'ITEM REGISTERED TO MYSQL BACKEND! READY FOR NEXT ENTRY.';
                 msg.style.display = 'block';
                 document.getElementById('itemName').value = '';
                 document.getElementById('length').value = '';
@@ -216,9 +239,12 @@
             }
         });
 
-        document.getElementById('goToEngineBtn').addEventListener('click', () => {
+        document.getElementById('goToEngineBtn').addEventListener('click', async () => {
             const itemName = document.getElementById('itemName').value;
-            if (itemName && !saveCurrentItem()) return;
+            if (itemName) {
+                const success = await saveCurrentItem();
+                if (!success) return;
+            }
             
             anime({
                 targets: '.gt-card', scale: [1, 0.95], opacity: [1, 0], duration: 400, easing: 'easeInOutQuad',

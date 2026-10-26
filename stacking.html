@@ -134,7 +134,6 @@
         </div>
     </main>
     <footer><p>&copy; 2026 CargoCraft Systems</p></footer>
-
     <script>
     (function() {
       const CFG = { clear: '#05060b', ink: '#c8cee0', bg: '#06070d', line: '#2c3d6b', hot: '#5cf2ff', cells: 1.4, speed: 0.55, grain: 0.016, dprCap: 1.5, maxFragments: 2400000, fps: 60, pointer: true };
@@ -168,78 +167,147 @@
       const P = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, on: 0 }; if (FINE && !MOBILE) { addEventListener('pointermove', e => { P.tx = e.clientX / innerWidth; P.ty = 1 - e.clientY / innerHeight; P.on = 1; }, { passive: true }); }
       gl.uniform3fv(U.uBg, rgb(CFG.bg)); gl.uniform3fv(U.uLine, rgb(CFG.line)); gl.uniform3fv(U.uHot, rgb(CFG.hot)); gl.uniform1f(U.uCells, CFG.cells); gl.uniform1f(U.uSpeed, CFG.speed); gl.uniform1f(U.uGrain, CFG.grain);
       function draw(t) { if (fit()) gl.viewport(0, 0, W, H); gl.uniform2f(U.uRes, W, H); gl.uniform1f(U.uTime, RM ? 3.0 : t); gl.uniform2f(U.uPointer, P.x, P.y); gl.uniform1f(U.uOn, P.on); gl.drawArrays(gl.TRIANGLES, 0, 3); }
-      const t0 = performance.now(); last = t0;
+      const t0 = performance.now(); let last = t0;
       function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000) || 0.016; last = now; const k = 1 - Math.pow(1 - 0.08, dt * 60); P.x += (P.tx - P.x) * k; P.y += (P.ty - P.y) * k; draw((now - t0) / 1000); }
       draw(0); requestAnimationFrame(loop);
     })();
     </script>
-    <script>
+
+ <script>
         document.addEventListener("DOMContentLoaded", () => {
             anime({ targets: 'body', opacity: 1, duration: 400 });
             anime({ targets: '.gt-card', translateY: [15, 0], opacity: [0, 1], duration: 600 });
 
-            const stage = document.getElementById('spatialStage');
-            let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
-
-            if (logs.length === 0) {
-                stage.innerHTML = `<div style="text-align: center; color: #8892b0; padding: 2rem;">No cargo items registered for spatial physics simulation. Please use the Input Module.</div>`;
-                return;
-            }
-
-            stage.innerHTML = '';
-
-            logs.forEach((item, index) => {
-                const dims = item.dimensions.replace(/m/g, '').split('×').map(Number);
-                const l = dims[0] || 2.0;
-                const w = dims[1] || 1.5;
-                const profile = item.geometryProfile || "Standard Rectangular Cuboid";
-                const isIrregular = profile !== "Standard Rectangular Cuboid";
-
-                let cols = Math.max(2, Math.round(6 / l));
-                let rows = Math.max(2, Math.round(4 / w));
-                let totalUnits = cols * rows;
-
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'spatial-item';
-                itemDiv.innerHTML = `
-                    <div class="spatial-header">
-                        <div>
-                            <strong style="color:#fff;">📦 ${item.itemName}</strong> 
-                            <span style="font-size:0.75rem; color:#8892b0;">(Container: ${item.containerName})</span>
-                        </div>
-                        <div style="display: flex; gap: 6px;">
-                            <span class="physics-badge">${profile}</span>
-                            <span class="efficiency-badge">Grid: ${cols}×${rows}</span>
-                        </div>
-                    </div>
-                    <div style="font-size:0.75rem; color:#8892b0;">
-                        Dimensions: ${item.dimensions} | Weight: ${item.weight.toLocaleString()} kg | Density: ${item.stackRule}
-                    </div>
-                    <div class="grid-matrix-preview" id="matrix-${index}"></div>
-                `;
-                stage.appendChild(itemDiv);
-
-                const matrixContainer = document.getElementById(`matrix-${index}`);
-                for (let r = 0; r < rows; r++) {
-                    for (let c = 0; c < cols; c++) {
-                        const cell = document.createElement('div');
-                        const isBoundary = isIrregular && (r === 0 || c === 0 || r === rows - 1 || c === cols - 1);
-                        cell.className = isBoundary ? 'matrix-cell irregular' : 'matrix-cell';
-                        cell.textContent = isBoundary ? `v:${r+1},${c+1}` : `${r+1},${c+1}`;
-                        matrixContainer.appendChild(cell);
-                    }
-                }
-            });
-
-            anime({
-                targets: '.spatial-item',
-                translateY: [15, 0],
-                opacity: [0, 1],
-                delay: anime.stagger(120),
-                duration: 600,
-                easing: 'easeOutExpo'
-            });
+            loadSpatialSimulation();
         });
+
+        async function loadSpatialSimulation() {
+            const stage = document.getElementById('spatialStage');
+
+            try {
+                // Fetch directly from live Java Spatial Packing API
+                const response = await fetch('http://localhost:8080/api/cargo');
+                if (!response.ok) throw new Error('Server returned ' + response.status);
+
+                const data = await response.json();
+                const items = data.items || [];
+
+                if (items.length === 0) {
+                    stage.innerHTML = `<div style="text-align: center; color: #8892b0; padding: 2rem;">No cargo items registered for spatial physics simulation. Please use the Input Module.</div>`;
+                    return;
+                }
+
+                stage.innerHTML = '';
+
+                // Header summary displaying live packing metrics computed by Java
+                const summaryDiv = document.createElement('div');
+                summaryDiv.style.cssText = "display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #2c3d6b; padding-bottom: 0.75rem; font-size: 0.8rem; color: #8892b0;";
+                summaryDiv.innerHTML = `
+                    <span>CONTAINER CAPACITY: <strong style="color: #5cf2ff;">28,000 kg</strong></span>
+                    <span>TOTAL MASS: <strong style="color: #5cf2ff;">${data.totalWeight} kg</strong></span>
+                    <span>VOLUME UTILIZATION: <strong style="color: #00ff66;">${data.utilization}%</strong></span>
+                `;
+                stage.appendChild(summaryDiv);
+
+                items.forEach((item, index) => {
+                    const l = item.length || 2.0;
+                    const w = item.width || 1.5;
+                    const h = item.height || 1.0;
+
+                    let cols = Math.max(2, Math.round(6 / l));
+                    let rows = Math.max(2, Math.round(4 / w));
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'spatial-item';
+                    itemDiv.innerHTML = `
+                        <div class="spatial-header">
+                            <div>
+                                <strong style="color:#fff;">📦 ${item.name}</strong> 
+                                <span style="font-size:0.75rem; color:#8892b0;">(ID: #${item.id})</span>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <span class="physics-badge">Stress: ${item.stressMpa} MPa</span>
+                                <span class="efficiency-badge" style="background: rgba(92,242,255,0.15); border-color: #5cf2ff; color: #5cf2ff;">
+                                    Pos: (${item.x}m, ${item.y}m, ${item.z}m)
+                                </span>
+                                <span class="efficiency-badge">Grid: ${cols}×${rows}</span>
+                            </div>
+                        </div>
+                        <div style="font-size:0.75rem; color:#8892b0;">
+                            Dimensions: ${l}m × ${w}m × ${h}m | Weight: ${(item.weight || 0).toLocaleString()} kg | SF: ${item.safetyFactor} (${item.status})
+                        </div>
+                        <div class="grid-matrix-preview" id="matrix-${index}"></div>
+                    `;
+                    stage.appendChild(itemDiv);
+
+                    const matrixContainer = document.getElementById(`matrix-${index}`);
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            const cell = document.createElement('div');
+                            const isEdge = (r === 0 || c === 0 || r === rows - 1 || c === cols - 1);
+                            cell.className = isEdge ? 'matrix-cell irregular' : 'matrix-cell';
+                            cell.textContent = `${r+1},${c+1}`;
+                            matrixContainer.appendChild(cell);
+                        }
+                    }
+                });
+
+                anime({
+                    targets: '.spatial-item',
+                    translateY: [15, 0],
+                    opacity: [0, 1],
+                    delay: anime.stagger(100),
+                    duration: 500,
+                    easing: 'easeOutExpo'
+                });
+
+            } catch (err) {
+                console.warn('Backend server unreachable, falling back to local session buffer:', err);
+                
+                // Fallback to local session storage if Java server is not running
+                let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
+                if (logs.length === 0) {
+                    stage.innerHTML = `<div style="text-align: center; color: #8892b0; padding: 2rem;">No cargo items registered for spatial physics simulation. Ensure CargoHttpServer is running.</div>`;
+                    return;
+                }
+
+                stage.innerHTML = '';
+                logs.forEach((item, index) => {
+                    const dims = (item.dimensions || "2m×1.5m×1m").replace(/m/g, '').split('×').map(Number);
+                    const l = dims[0] || 2.0;
+                    const w = dims[1] || 1.5;
+                    let cols = Math.max(2, Math.round(6 / l));
+                    let rows = Math.max(2, Math.round(4 / w));
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'spatial-item';
+                    itemDiv.innerHTML = `
+                        <div class="spatial-header">
+                            <div><strong style="color:#fff;">📦 ${item.itemName}</strong></div>
+                            <div style="display: flex; gap: 6px;">
+                                <span class="physics-badge">${item.geometryProfile || 'Cuboid'}</span>
+                                <span class="efficiency-badge">Offline Buffer</span>
+                            </div>
+                        </div>
+                        <div style="font-size:0.75rem; color:#8892b0;">
+                            Dimensions: ${item.dimensions} | Weight: ${(item.weight || 0).toLocaleString()} kg
+                        </div>
+                        <div class="grid-matrix-preview" id="matrix-${index}"></div>
+                    `;
+                    stage.appendChild(itemDiv);
+
+                    const matrixContainer = document.getElementById(`matrix-${index}`);
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            const cell = document.createElement('div');
+                            cell.className = 'matrix-cell';
+                            cell.textContent = `${r+1},${c+1}`;
+                            matrixContainer.appendChild(cell);
+                        }
+                    }
+                });
+            }
+        }
     </script>
 </body>
 </html>
