@@ -23,15 +23,21 @@
         .status-banner.safe { background-color: rgba(0, 255, 102, 0.15); color: #00ff66; border-color: #00ff66; }
         .status-banner.danger { background-color: rgba(255, 51, 68, 0.2); color: #ff3344; border-color: #ff3344; animation: pulse-danger 1s infinite alternate; }
         @keyframes pulse-danger { 0% { transform: scale(1); } 100% { transform: scale(1.01); box-shadow: 0 0 15px rgba(255,51,68,0.4); } }
+        .weight-indicator { margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #2c3d6b; border-radius: 6px; background-color: rgba(12, 14, 20, 0.8); }
+        .weight-indicator__summary { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.65rem; font-size: 0.8rem; }
+        .weight-indicator__bar { height: 12px; overflow: hidden; border-radius: 999px; background-color: #1a233a; }
+        .weight-indicator__fill { height: 100%; width: 0; border-radius: inherit; background-color: #00ff66; transition: width 0.3s ease, background-color 0.3s ease; }
+        .weight-indicator.overweight { border-color: #ff3344; }
+        .weight-indicator.overweight .weight-indicator__fill { background-color: #ff3344; }
+        .weight-indicator__status { margin-top: 0.65rem; color: #8892b0; font-size: 0.75rem; }
+        .weight-indicator.overweight .weight-indicator__status { color: #ff3344; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
         th, td { padding: 0.75rem; text-align: left; border-bottom: 1px dashed #2c3d6b; color: #c8cee0; background-color: rgba(12, 14, 20, 0.6); }
         th { background-color: rgba(26, 35, 58, 0.85); color: #5cf2ff; border: 1px solid #2c3d6b; text-transform: uppercase; font-size: 0.7rem; }
         .log-row { opacity: 0; transform: translateX(-10px); }
-        .action-btns { display: flex; gap: 0.75rem; align-items: center; }
+        .action-btns { display: flex; gap: 0.75rem; align-items: center; margin-top: 1rem; }
         .gt-btn-clear { display: inline-block; padding: 8px 16px; background-color: rgba(255, 51, 68, 0.2); color: #ff3344; border: 1px solid #ff3344; border-radius: 6px; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; cursor: pointer; transition: background 0.2s; }
         .gt-btn-clear:hover { background-color: #ff3344; color: #05060b; }
-        .del-row-btn { background: none; border: none; color: #ff3344; cursor: pointer; font-size: 0.9rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; }
-        .del-row-btn:hover { background: rgba(255,51,68,0.2); }
         .gt-btn-visual { display: inline-block; padding: 8px 16px; background-color: #5cf2ff; color: #05060b; border: 1px solid #5cf2ff; border-radius: 6px; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; text-decoration: none; cursor: pointer; }
         .gt-btn-visual:hover { background-color: #fff; }
         footer { background-color: rgba(5, 6, 11, 0.9); color: #555; text-align: center; padding: 1rem; font-size: 0.75rem; border-top: 1px solid rgba(44, 61, 107, 0.5); z-index: 10; }
@@ -57,6 +63,17 @@
             
             <div id="statusBanner" class="status-banner">
                 Initializing Simulation Engine...
+            </div>
+
+            <div id="weightIndicator" class="weight-indicator">
+                <div class="weight-indicator__summary">
+                    <span>Cargo Weight / Container Capacity</span>
+                    <strong id="weightSummary">Calculating...</strong>
+                </div>
+                <div class="weight-indicator__bar" role="progressbar" aria-label="Cargo weight capacity">
+                    <div id="weightFill" class="weight-indicator__fill"></div>
+                </div>
+                <div id="weightStatus" class="weight-indicator__status">Checking cargo weight against container capacity.</div>
             </div>
 
             <table>
@@ -120,8 +137,7 @@
       draw(0); requestAnimationFrame(loop);
     })();
     </script>
-
-<script>
+    <script>
         document.addEventListener("DOMContentLoaded", () => {
             anime.timeline({ easing: 'easeOutExpo' })
                 .add({ targets: 'body', opacity: 1, duration: 400 })
@@ -130,45 +146,74 @@
             loadSimulationEngine();
 
             document.getElementById('clearBtn').addEventListener('click', async () => {
-                sessionStorage.removeItem('cargoLogs');
-                loadSimulationEngine();
+                const button = document.getElementById('clearBtn');
+                button.disabled = true;
+                try {
+                    const response = await fetch('http://localhost:8080/api/cargo', { method: 'DELETE' });
+                    if (!response.ok) throw new Error('Server returned ' + response.status);
+                    await loadSimulationEngine();
+                } catch (err) {
+                    console.error('Failed to clear cargo records:', err);
+                    alert('Unable to clear cargo records. Make sure CargoHttpServer and MySQL are running.');
+                } finally {
+                    button.disabled = false;
+                }
             });
         });
 
         async function loadSimulationEngine() {
             const tbody = document.getElementById('engineTableBody');
             const banner = document.getElementById('statusBanner');
+            const fallbackMaxLimit = 28000.0;
+            const weightIndicator = document.getElementById('weightIndicator');
+            const weightSummary = document.getElementById('weightSummary');
+            const weightFill = document.getElementById('weightFill');
+            const weightStatus = document.getElementById('weightStatus');
 
             try {
-                // Fetch directly from live Java REST server
                 const response = await fetch('http://localhost:8080/api/cargo');
                 if (!response.ok) throw new Error('Server returned ' + response.status);
                 
                 const data = await response.json();
                 const items = data.items || [];
+                const maxLimit = parseFloat(data.containerMaxWeight) || fallbackMaxLimit;
 
                 if (items.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #8892b0; padding: 2rem;">No active cargo records in database. Use the Input Module to register items.</td></tr>`;
+                    weightIndicator.classList.remove('overweight');
+                    weightSummary.textContent = `0 / ${maxLimit.toLocaleString()} kg (0.0%)`;
+                    weightFill.style.width = '0%';
+                    weightStatus.textContent = `${maxLimit.toLocaleString()} kg available for cargo.`;
                     banner.className = 'status-banner safe';
                     banner.innerHTML = `✅ SYSTEM STATUS: No Cargo Loaded. Ready for Input Stream.`;
                     return;
                 }
 
                 tbody.innerHTML = '';
-                let totalWeight = parseFloat(data.totalWeight) || 0;
-                let maxLimit = 28000.0; // ISO Standard Dry Van Limit
+                const totalWeight = parseFloat(data.totalWeight) || 0;
 
                 items.forEach((item) => {
                     const row = document.createElement('tr');
                     row.className = 'log-row';
+
+                    let statusHtml = `<span style="color: #5cf2ff; font-weight: bold;">SF: ${item.safetyFactor} (${item.status})</span>`;
+                    let stressHtml = `Stress: ${item.stressMpa} MPa`;
+                    let actionHtml = `<button onclick="deleteItem(${item.id})" style="padding: 4px 8px; background: rgba(255,51,68,0.2); color: #ff3344; border: 1px solid #ff3344; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold;">🗑️ Remove</button>`;
+
+                    if (item.status === 'EXCLUDED') {
+                        statusHtml = `<span style="color: #ff3344; font-weight: bold;'>⚠️ EXCLUDED</span>`;
+                        stressHtml = `<span style="color: #ffb700; font-size: 0.75rem; font-weight: bold;">${item.reason}</span>`;
+                        row.style.backgroundColor = 'rgba(255, 51, 68, 0.08)';
+                    }
+
                     row.innerHTML = `
-                        <td><strong>ISO 20ft</strong></td>
+                        <td><strong>${data.containerName || 'ISO 20ft'}</strong></td>
                         <td>${item.name}</td>
                         <td>${item.length}m × ${item.width}m × ${item.height}m</td>
-                        <td>${item.weight.toLocaleString()} kg</td>
-                        <td><span style="color: #5cf2ff; font-weight: bold;">SF: ${item.safetyFactor} (${item.status})</span></td>
-                        <td>Stress: ${item.stressMpa} MPa</td>
-                        <td><span style="color: #00ff66;">✓ Synced</span></td>
+                        <td>${(item.weight || 0).toLocaleString()} kg</td>
+                        <td>${statusHtml}</td>
+                        <td>${stressHtml}</td>
+                        <td>${actionHtml}</td>
                     `;
                     tbody.appendChild(row);
                 });
@@ -183,48 +228,43 @@
                 });
 
                 const ratio = (totalWeight / maxLimit) * 100;
+                const displayedRatio = Math.min(ratio, 100);
+                weightIndicator.classList.toggle('overweight', totalWeight > maxLimit);
+                weightFill.style.width = `${displayedRatio}%`;
+                weightSummary.textContent = `${totalWeight.toLocaleString()} / ${maxLimit.toLocaleString()} kg (${ratio.toFixed(1)}%)`;
 
                 if (totalWeight > maxLimit) {
+                    const excessWeight = totalWeight - maxLimit;
+                    weightStatus.textContent = `OVERWEIGHT: ${excessWeight.toLocaleString()} kg over the ${maxLimit.toLocaleString()} kg limit.`;
                     banner.className = 'status-banner danger';
                     banner.innerHTML = `🚨 CRITICAL WARNING: Total Cargo Weight (${totalWeight.toLocaleString()} kg) Exceeds Max Limit (${maxLimit.toLocaleString()} kg)! High Risk of Structural Failure.`;
                 } else if (ratio > 85) {
+                    weightStatus.textContent = `${(maxLimit - totalWeight).toLocaleString()} kg remaining before the ${maxLimit.toLocaleString()} kg limit.`;
                     banner.className = 'status-banner';
                     banner.style.backgroundColor = 'rgba(217, 119, 6, 0.2)';
                     banner.style.color = '#ffb700';
                     banner.style.borderColor = '#ffb700';
                     banner.innerHTML = `⚠️ WARNING: Capacity at ${ratio.toFixed(1)}%. Approaching maximum load safety threshold.`;
                 } else {
+                    weightStatus.textContent = `${(maxLimit - totalWeight).toLocaleString()} kg remaining before the ${maxLimit.toLocaleString()} kg limit.`;
                     banner.className = 'status-banner safe';
                     banner.innerHTML = `✅ SYSTEM STATUS: All Stacking Margins Stable (${ratio.toFixed(1)}% Capacity Used | Vol Util: ${data.utilization}%). Safe for Transit.`;
                 }
 
             } catch (err) {
-                console.warn('Backend server unreachable, falling back to local session buffer:', err);
-                
-                // Fallback to local session storage if Java backend is offline
-                let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
-                if (logs.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #8892b0; padding: 2rem;">No active cargo logs found. Ensure CargoHttpServer is running.</td></tr>`;
-                    banner.className = 'status-banner safe';
-                    banner.innerHTML = `✅ SYSTEM STATUS: No Cargo Loaded. Ready for Input Stream.`;
-                    return;
-                }
+                console.warn('Backend server unreachable:', err);
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ff3344; padding: 2rem;">Backend server unreachable. Ensure CargoHttpServer is running.</td></tr>`;
+            }
+        }
 
-                tbody.innerHTML = '';
-                logs.forEach((item, index) => {
-                    const row = document.createElement('tr');
-                    row.className = 'log-row';
-                    row.innerHTML = `
-                        <td><strong>${item.containerName || 'ISO 20ft'}</strong></td>
-                        <td>${item.itemName}</td>
-                        <td>${item.length || item.dimensions}m</td>
-                        <td>${(item.weight || 0).toLocaleString()} kg</td>
-                        <td><span style="color: #5cf2ff; font-weight: bold;">▸ ${item.densityClass || item.stackRule}</span></td>
-                        <td>Local Buffer</td>
-                        <td><span style="color: #ffb700;">Offline Mode</span></td>
-                    `;
-                    tbody.appendChild(row);
-                });
+        async function deleteItem(id) {
+            try {
+                const response = await fetch(`http://localhost:8080/api/cargo/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete item');
+                await loadSimulationEngine();
+            } catch (err) {
+                console.error(err);
+                alert('Could not delete item.');
             }
         }
     </script>

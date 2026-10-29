@@ -172,8 +172,7 @@
       draw(0); requestAnimationFrame(loop);
     })();
     </script>
-
- <script>
+    <script>
         document.addEventListener("DOMContentLoaded", () => {
             anime({ targets: 'body', opacity: 1, duration: 400 });
             anime({ targets: '.gt-card', translateY: [15, 0], opacity: [0, 1], duration: 600 });
@@ -185,7 +184,6 @@
             const stage = document.getElementById('spatialStage');
 
             try {
-                // Fetch directly from live Java Spatial Packing API
                 const response = await fetch('http://localhost:8080/api/cargo');
                 if (!response.ok) throw new Error('Server returned ' + response.status);
 
@@ -199,7 +197,6 @@
 
                 stage.innerHTML = '';
 
-                // Header summary displaying live packing metrics computed by Java
                 const summaryDiv = document.createElement('div');
                 summaryDiv.style.cssText = "display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #2c3d6b; padding-bottom: 0.75rem; font-size: 0.8rem; color: #8892b0;";
                 summaryDiv.innerHTML = `
@@ -214,11 +211,35 @@
                     const w = item.width || 1.5;
                     const h = item.height || 1.0;
 
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'spatial-item';
+
+                    if (item.status === 'EXCLUDED') {
+                        itemDiv.style.borderColor = '#ff3344';
+                        itemDiv.style.backgroundColor = 'rgba(255, 51, 68, 0.08)';
+                        itemDiv.innerHTML = `
+                            <div class="spatial-header" style="border-color: rgba(255,51,68,0.3);">
+                                <div>
+                                    <strong style="color:#ff3344;">⚠️ ${item.name}</strong> 
+                                </div>
+                                <div>
+                                    <span class="efficiency-badge" style="background: rgba(255,51,68,0.2); border-color: #ff3344; color: #ff3344;">EXCLUDED</span>
+                                </div>
+                            </div>
+                            <div style="font-size:0.75rem; color:#ffb700; font-weight: bold;">
+                                Reason: ${item.reason}
+                            </div>
+                            <div style="font-size:0.75rem; color:#8892b0;">
+                                Attempted Dimensions: ${l}m × ${w}m × ${h}m | Weight: ${(item.weight || 0).toLocaleString()} kg
+                            </div>
+                        `;
+                        stage.appendChild(itemDiv);
+                        return;
+                    }
+
                     let cols = Math.max(2, Math.round(6 / l));
                     let rows = Math.max(2, Math.round(4 / w));
 
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'spatial-item';
                     itemDiv.innerHTML = `
                         <div class="spatial-header">
                             <div>
@@ -262,50 +283,8 @@
                 });
 
             } catch (err) {
-                console.warn('Backend server unreachable, falling back to local session buffer:', err);
-                
-                // Fallback to local session storage if Java server is not running
-                let logs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
-                if (logs.length === 0) {
-                    stage.innerHTML = `<div style="text-align: center; color: #8892b0; padding: 2rem;">No cargo items registered for spatial physics simulation. Ensure CargoHttpServer is running.</div>`;
-                    return;
-                }
-
-                stage.innerHTML = '';
-                logs.forEach((item, index) => {
-                    const dims = (item.dimensions || "2m×1.5m×1m").replace(/m/g, '').split('×').map(Number);
-                    const l = dims[0] || 2.0;
-                    const w = dims[1] || 1.5;
-                    let cols = Math.max(2, Math.round(6 / l));
-                    let rows = Math.max(2, Math.round(4 / w));
-
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'spatial-item';
-                    itemDiv.innerHTML = `
-                        <div class="spatial-header">
-                            <div><strong style="color:#fff;">📦 ${item.itemName}</strong></div>
-                            <div style="display: flex; gap: 6px;">
-                                <span class="physics-badge">${item.geometryProfile || 'Cuboid'}</span>
-                                <span class="efficiency-badge">Offline Buffer</span>
-                            </div>
-                        </div>
-                        <div style="font-size:0.75rem; color:#8892b0;">
-                            Dimensions: ${item.dimensions} | Weight: ${(item.weight || 0).toLocaleString()} kg
-                        </div>
-                        <div class="grid-matrix-preview" id="matrix-${index}"></div>
-                    `;
-                    stage.appendChild(itemDiv);
-
-                    const matrixContainer = document.getElementById(`matrix-${index}`);
-                    for (let r = 0; r < rows; r++) {
-                        for (let c = 0; c < cols; c++) {
-                            const cell = document.createElement('div');
-                            cell.className = 'matrix-cell';
-                            cell.textContent = `${r+1},${c+1}`;
-                            matrixContainer.appendChild(cell);
-                        }
-                    }
-                });
+                console.warn('Backend server unreachable:', err);
+                stage.innerHTML = `<div style="text-align: center; color: #ff3344; padding: 2rem;">Backend server unreachable. Ensure CargoHttpServer is running.</div>`;
             }
         }
     </script>

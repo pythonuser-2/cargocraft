@@ -24,8 +24,9 @@
         input, select { width: 100%; padding: 0.75rem; border: 1px solid #2c3d6b; border-radius: 6px; font-size: 0.9rem; font-family: inherit; background-color: rgba(12, 14, 20, 0.95); color: #ffffff; outline: none; }
         input:focus, select:focus { background-color: #121520; border-color: #5cf2ff; box-shadow: 0 0 10px rgba(92,242,255,0.2); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
         .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
-        @media(max-width: 600px) { .button-group { grid-template-columns: 1fr; } }
+        @media(max-width: 600px) { .button-group { grid-template-columns: 1fr; } .grid-3 { grid-template-columns: 1fr; } }
         .gt-btn { width: 100%; min-height: 48px; padding: 12px; background-color: #5cf2ff; color: #05060b; border: 1px solid #5cf2ff; border-radius: 6px; font-weight: bold; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 12px rgba(92,242,255,0.2); transition: all 0.2s; }
         .gt-btn:hover { background-color: #ffffff; box-shadow: 0 0 20px rgba(92,242,255,0.5); }
         .gt-btn-redirect { background-color: transparent; color: #c8cee0; border-color: #2c3d6b; box-shadow: none; }
@@ -64,24 +65,43 @@
                         <input type="text" id="itemName" placeholder="e.g., Industrial Hydraulic Generator" required>
                     </div>
                 </div>
+                
+                <div class="form-group">
+                    <label style="color: #5cf2ff;">Container Envelope Dimensions (Meters)</label>
+                    <div class="grid-3">
+                        <div>
+                            <label for="containerLength">Length (m)</label>
+                            <input type="number" step="0.1" id="containerLength" value="5.9" required>
+                        </div>
+                        <div>
+                            <label for="containerWidth">Width (m)</label>
+                            <input type="number" step="0.1" id="containerWidth" value="2.35" required>
+                        </div>
+                        <div>
+                            <label for="containerHeight">Height (m)</label>
+                            <input type="number" step="0.1" id="containerHeight" value="2.39" required>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid-2">
                     <div class="form-group">
-                        <label for="length">Bounding Length (m)</label>
-                        <input type="number" step="0.1" id="length" placeholder="3.5" required>
+                        <label for="length">Item Bounding Length (m)</label>
+                        <input type="number" step="0.1" id="length" required>
                     </div>
                     <div class="form-group">
-                        <label for="width">Bounding Width (m)</label>
-                        <input type="number" step="0.1" id="width" placeholder="2.2" required>
+                        <label for="width">Item Bounding Width (m)</label>
+                        <input type="number" step="0.1" id="width" required>
                     </div>
                 </div>
                 <div class="grid-2">
                     <div class="form-group">
-                        <label for="height">Bounding Height (m)</label>
-                        <input type="number" step="0.1" id="height" placeholder="2.0" required>
+                        <label for="height">Item Bounding Height (m)</label>
+                        <input type="number" step="0.1" id="height" required>
                     </div>
                     <div class="form-group">
                         <label for="weight">Item Weight (kg)</label>
-                        <input type="number" id="weight" placeholder="12000" required>
+                        <input type="number" id="weight" required>
                     </div>
                 </div>
                 <div class="grid-2">
@@ -169,6 +189,10 @@
         async function saveCurrentItem() {
             const containerName = document.getElementById('containerName').value;
             const maxWeight = document.getElementById('maxWeight').value;
+            const containerLength = document.getElementById('containerLength').value;
+            const containerWidth = document.getElementById('containerWidth').value;
+            const containerHeight = document.getElementById('containerHeight').value;
+            
             const itemName = document.getElementById('itemName').value;
             const length = document.getElementById('length').value;
             const width = document.getElementById('width').value;
@@ -180,8 +204,8 @@
             feedbackMsg.style.display = 'none';
             errorMsg.style.display = 'none';
 
-            if (!containerName || !maxWeight || !itemName || !length || !width || !height || !weight) {
-                errorMsg.innerText = '⚠️ Error: Please fill out all required cargo fields before registering.';
+            if (!containerName || !maxWeight || !containerLength || !containerWidth || !containerHeight || !itemName || !length || !width || !height || !weight) {
+                errorMsg.innerText = '⚠️ Error: Please fill out all required container and cargo fields.';
                 errorMsg.style.display = 'block';
                 anime({ targets: '#errorMsg', scale: [0.95, 1], opacity: [0, 1], duration: 300, easing: 'easeOutQuad' });
                 return false;
@@ -190,6 +214,9 @@
             const cargoData = {
                 containerName: containerName,
                 maxWeight: parseFloat(maxWeight),
+                containerLength: parseFloat(containerLength),
+                containerWidth: parseFloat(containerWidth),
+                containerHeight: parseFloat(containerHeight),
                 itemName: itemName,
                 length: parseFloat(length),
                 width: parseFloat(width),
@@ -201,7 +228,6 @@
             };
 
             try {
-                // Post directly to the Java CargoHttpServer endpoint
                 const response = await fetch('http://localhost:8080/api/cargo', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -209,12 +235,6 @@
                 });
 
                 if (!response.ok) throw new Error('Server returned ' + response.status);
-                
-                // Keep local session updated for immediate UI continuity
-                let existingLogs = JSON.parse(sessionStorage.getItem('cargoLogs')) || [];
-                existingLogs.push(cargoData);
-                sessionStorage.setItem('cargoLogs', JSON.stringify(existingLogs));
-
                 return true;
             } catch (err) {
                 console.error('Failed to persist to Java backend:', err);
